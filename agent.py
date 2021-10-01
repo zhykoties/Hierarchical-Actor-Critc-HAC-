@@ -17,8 +17,8 @@ class Agent():
         # Set subgoal testing ratio each layer will use
         self.subgoal_test_perc = agent_params["subgoal_test_perc"]
 
-        # Create agent with number of levels specified by user       
-        self.layers = [Layer(i,FLAGS,env,self.sess,agent_params) for i in range(FLAGS.layers)]        
+        # Create agent with number of levels specified by user
+        self.layers = [Layer(i,FLAGS,env,self.sess,agent_params) for i in range(FLAGS.layers)]
 
         # Below attributes will be used help save network parameters
         self.saver = None
@@ -26,8 +26,8 @@ class Agent():
         self.model_loc = None
 
         # Initialize actor/critic networks.  Load saved parameters if not retraining
-        self.initialize_networks()   
-        
+        self.initialize_networks()
+
         # goal_array will store goal for each layer of agent.
         self.goal_array = [None for i in range(FLAGS.layers)]
 
@@ -60,11 +60,11 @@ class Agent():
         for i in range(self.FLAGS.layers):
 
             goal_achieved = True
-            
+
             # If at highest layer, compare to end goal thresholds
             if i == self.FLAGS.layers - 1:
 
-                # Check dimensions are appropriate         
+                # Check dimensions are appropriate
                 assert len(proj_end_goal) == len(self.goal_array[i]) == len(env.end_goal_thresholds), "Projected end goal, actual end goal, and end goal thresholds should have same dimensions"
 
                 # Check whether layer i's goal was achieved by checking whether projected state is within the goal achievement threshold
@@ -77,7 +77,7 @@ class Agent():
             else:
 
                 # Check that dimensions are appropriate
-                assert len(proj_subgoal) == len(self.goal_array[i]) == len(env.subgoal_thresholds), "Projected subgoal, actual subgoal, and subgoal thresholds should have same dimensions"           
+                assert len(proj_subgoal) == len(self.goal_array[i]) == len(env.subgoal_thresholds), "Projected subgoal, actual subgoal, and subgoal thresholds should have same dimensions"
 
                 # Check whether layer i's goal was achieved by checking whether projected state is within the goal achievement threshold
                 for j in range(len(proj_subgoal)):
@@ -91,7 +91,7 @@ class Agent():
                 max_lay_achieved = i
             else:
                 goal_status[i] = False
-            
+
 
         return goal_status, max_lay_achieved
 
@@ -125,19 +125,21 @@ class Agent():
     # Update actor and critic networks for each layer
     def learn(self):
 
-        for i in range(len(self.layers)):   
+        for i in range(len(self.layers)):
             self.layers[i].learn(self.num_updates)
 
-       
-    # Train agent for an episode
-    def train(self,env, episode_num):
 
-        # Select final goal from final goal space, defined in "design_agent_and_env.py" 
+    # Train agent for an episode
+    def train(self,env, episode_num, total_episodes):
+
+        # Select final goal from final goal space, defined in "design_agent_and_env.py"
         self.goal_array[self.FLAGS.layers - 1] = env.get_next_goal(self.FLAGS.test)
         print("Next End Goal: ", self.goal_array[self.FLAGS.layers - 1])
 
         # Select initial state from in initial state space, defined in environment.py
-        self.current_state = env.reset_sim()
+        self.current_state = env.reset_sim(self.goal_array[self.FLAGS.layers - 1])
+        if env.name == "ant_reacher.xml":
+            print("Initial Ant Position: ", self.current_state[:3])
         # print("Initial State: ", self.current_state)
 
         # Reset step counter
@@ -147,27 +149,18 @@ class Agent():
         goal_status, max_lay_achieved = self.layers[self.FLAGS.layers-1].train(self,env, episode_num = episode_num)
 
         # Update actor/critic networks if not testing
-        if not self.FLAGS.test:
+        if not self.FLAGS.test and total_episodes > self.other_params["num_pre_training_episodes"]:
             self.learn()
 
         # Return whether end goal was achieved
         return goal_status[self.FLAGS.layers-1]
 
-    
+
     # Save performance evaluations
     def log_performance(self, success_rate):
-        
+
         # Add latest success_rate to list
         self.performance_log.append(success_rate)
 
         # Save log
         cpickle.dump(self.performance_log,open("performance_log.p","wb"))
-        
-
-        
-
-        
-        
-        
-
-
